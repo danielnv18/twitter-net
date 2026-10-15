@@ -31,6 +31,30 @@ See [Vite Configuration Reference](https://vite.dev/config/).
 npm install
 ```
 
+### UI components with shadcn-vue
+
+[shadcn-vue](https://www.shadcn-vue.com/docs/installation/vite) is configured with
+Tailwind CSS v4, the Nova style, and the Neutral base color. Global styles and theme
+variables live in `src/assets/main.css`; CLI settings live in `components.json`.
+
+The Button component is installed and ready to import:
+
+```vue
+<script setup lang="ts">
+import { Button } from '@/components/ui/button'
+</script>
+
+<template>
+  <Button>Continue</Button>
+</template>
+```
+
+Add more components from the official registry from the `client/` directory:
+
+```sh
+npx shadcn-vue@latest add @shadcn/input
+```
+
 ### Compile and Hot-Reload for Development
 
 ```sh
