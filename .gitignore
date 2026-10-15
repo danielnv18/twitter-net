@@ -18,8 +18,3 @@
 .idea/
 .DS_Store
 Thumbs.db
-
-# Local agent configuration
-.agents/
-.codex/
-.aws/
