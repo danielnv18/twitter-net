@@ -1,5 +1,14 @@
-node_modules
-dist
+**/node_modules
+**/dist
+dist-ssr
 .env
 .env.*
 *.log
+.git
+.vscode
+coverage
+test-results
+playwright-report
+**/__screenshots__
+*.tsbuildinfo
+.eslintcache

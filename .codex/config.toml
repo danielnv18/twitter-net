@@ -1,0 +1,6 @@
+# Project MCP configuration. Copy to .codex/config.toml to activate in Codex.
+[mcp_servers.context7]
+url = "https://mcp.context7.com/mcp/oauth"
+
+[mcp_servers.microsoft-learn]
+url = "https://learn.microsoft.com/api/mcp"

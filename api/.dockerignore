@@ -1,5 +1,11 @@
-bin
-obj
+**/bin
+**/obj
+publish
 .env
 .env.*
 *.log
+.git
+.vs
+.vscode
+*.user
+*.suo
