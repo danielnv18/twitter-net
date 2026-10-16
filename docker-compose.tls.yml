@@ -1,0 +1,7 @@
+services:
+  client:
+    ports:
+      - "${HTTPS_BIND_ADDRESS:-127.0.0.1}:${HTTPS_PORT:-8443}:5174"
+    volumes:
+      - ./deployment/nginx-tls.conf:/etc/nginx/tls/https.conf:ro
+      - ${TLS_CERTIFICATE_DIR:?Set TLS_CERTIFICATE_DIR to the absolute certificate directory}:/etc/nginx/certificates:ro
