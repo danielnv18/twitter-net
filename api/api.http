@@ -4,3 +4,8 @@ GET {{api_HostAddress}}/health
 Accept: text/plain
 
 ###
+
+GET {{api_HostAddress}}/health/ready
+Accept: text/plain
+
+###

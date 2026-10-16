@@ -11,6 +11,10 @@ COPY --chown=app:app api.csproj ./
 RUN dotnet restore api.csproj
 COPY --chown=app:app . .
 
+FROM source AS ef-tools
+RUN dotnet tool restore
+ENTRYPOINT ["dotnet", "ef"]
+
 FROM source AS publish
 RUN dotnet publish api.csproj --configuration Release --no-restore \
     --output /app/publish /p:UseAppHost=false

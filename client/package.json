@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "dotnet run --project ../api/api.csproj",
+    "dev:all": "run-p --race dev:api \"dev -- --strictPort\"",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "test:unit": "vitest",

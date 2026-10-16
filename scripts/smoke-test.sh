@@ -10,6 +10,12 @@ if [ "$health" != 'Healthy' ]; then
   exit 1
 fi
 
+readiness=$(curl --fail --silent --show-error --max-time 10 "$api_url/health/ready")
+if [ "$readiness" != 'Healthy' ]; then
+  printf 'Unexpected API readiness response: %s\n' "$readiness" >&2
+  exit 1
+fi
+
 client_html=$(curl --fail --silent --show-error --max-time 10 "$client_url/")
 if ! printf '%s' "$client_html" | grep -q '<div id="app"></div>'; then
   printf 'Client did not serve the Vue application.\n' >&2
@@ -33,4 +39,4 @@ if [ -n "$runtime_entrypoint" ]; then
   fi
 fi
 
-printf 'API health and client HTTP smoke tests passed.\n'
+printf 'API health, database readiness, and client HTTP smoke tests passed.\n'

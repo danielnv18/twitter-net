@@ -5,17 +5,22 @@
 - `api/` contains a .NET 10 ASP.NET Core API. Routes live in `Program.cs`; `api.http` provides sample requests.
 - `client/src/` contains Vue components and TypeScript, with routing in `router/` and Pinia stores in `stores/`. Put static assets in `client/public/`.
 - Client unit tests live in `client/src/__tests__/`; browser tests live in `client/e2e/`.
-- Root `docker-compose.yml` connects the API, client, and MySQL. Each application has its own Dockerfile.
+- Root `docker-compose.yml` connects the production API, compiled client, and MySQL. Each application has its own Dockerfile. `docker-compose.dev.yml` runs only the development database for host CLI development.
 
 ## Build, Test, and Development Commands
 
 Run Compose commands from the repository root:
 
-- `docker compose up --build`: build and start all services; client uses port 5173 and API uses 8080 by default.
+- `docker compose up --build`: build and start the production stack; client uses port 5173 and API uses 8080 by default.
 - `docker compose down`: stop services, preserving database volumes.
 - `docker compose config --quiet`: validate Compose configuration.
+- `docker compose -f docker-compose.dev.yml up -d --wait`: start the separate development MySQL database on loopback port 3307.
+- `docker compose -f docker-compose.dev.yml down`: stop the development database, preserving its volume.
+- `docker compose -f docker-compose.dev.yml config --quiet`: validate development Compose configuration.
 - `dotnet build api/api.csproj`: restore dependencies and build the API.
-- `dotnet run --project api/api.csproj`: run the API using its launch configuration.
+- `dotnet run --project api/api.csproj`: run the API in Development on port 5078 using its launch configuration and development connection string.
+
+Preserve both run modes. Use Docker for the production stack and host `dotnet` and `npm` commands for development. Stop one mode before starting the other. Keep their MySQL volumes separate.
 
 For client commands, first run `cd client` and `npm install`:
 
@@ -44,4 +49,4 @@ Pull requests should explain changes, link issues, list validation, and include 
 
 ## Security & Configuration
 
-Use `.env.example` as the template for ignored local `.env` files. Never commit secrets. Compose credentials are development defaults; MySQL data persists in a named volume. Database connectivity is not yet implemented in the API. Treat `VITE_` variables as public browser configuration.
+Use `.env.example` as the template for ignored local `.env` files. The root `.env` configures the production Compose stack only. Never commit secrets. Compose credentials are local defaults; MySQL data persists in separate named volumes for each mode. `api/appsettings.Development.json` matches the fixed development database credentials; environment variables or .NET user secrets can override that connection string. The API uses EF Core with MySQL through `ConnectionStrings__DefaultConnection`; `/health/ready` checks database connectivity. Treat `VITE_` variables as public browser configuration.
