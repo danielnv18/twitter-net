@@ -1,13 +1,13 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help install dev migrate
+.PHONY: help install dev migrate migrate-dev test-api
 
 help:
-	@printf '%s\n' 'make install  Install npm dependencies, NuGet packages, and the EF tool.' 'make dev      Start development MySQL and run the host API and client.' 'make migrate  Apply EF migrations to the production Compose database.'
+	@printf '%s\n' 'make install  Install npm dependencies, NuGet packages, and the EF tool.' 'make dev      Start development MySQL and run the host API and client.' 'make migrate  Apply EF migrations to the production Compose database.' 'make migrate-dev Apply EF migrations to development MySQL.' 'make test-api Run API integration tests against isolated test MySQL.'
 
 install:
 	npm --prefix client install
-	dotnet restore api/api.csproj
+	dotnet restore api.Tests/api.Tests.csproj
 	cd api && dotnet tool restore
 
 dev:
@@ -17,7 +17,14 @@ dev:
 		exit 1; \
 	fi
 	docker compose -f docker-compose.dev.yml up -d --wait
+	$(MAKE) migrate-dev
 	npm --prefix client run dev:all
 
 migrate:
 	docker compose --profile tools run --build --rm ef database update
+
+migrate-dev:
+	cd api && dotnet ef database update -- --environment Development
+
+test-api:
+	dotnet test api.Tests/api.Tests.csproj

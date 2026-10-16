@@ -1,177 +1,125 @@
 # Twitter Net
 
-A basic X/Twitter clone planned with a .NET API, a Vue.js client, and MySQL. Use Docker Compose for the production stack and host CLI commands for development. No X/Twitter application features are implemented yet.
+A Vue 3 client, .NET 10 API, and MySQL application with account signup, sign-in, a protected profile, and sign-out. Signup asks for a name, username, email, and password. Sign-in accepts a username or email. The profile displays the name and username.
 
-## Structure
+## Run development
 
-```text
-api/                 # .NET 10 API and multi-stage Dockerfile
-client/              # Vue.js client, multi-stage Dockerfile, and Nginx config
-docker-compose.yml   # Built API, compiled client, and MySQL services
-docker-compose.dev.yml # Development MySQL for host CLI commands
-scripts/             # HTTP smoke tests for the running apps
-.env.example         # Optional production Compose configuration
-LICENSE              # MIT license
-```
-
-## Run the production stack with Docker
-
-Install Docker with Docker Compose, then run from the repository root:
-
-```sh
-docker compose up --build --wait
-```
-
-Docker publishes the API in Release mode and runs its DLL in an ASP.NET runtime image. The client build runs `npm ci` and `npm run build`, including TypeScript checking, then copies only `dist/` into an Nginx runtime image. Both apps run their compiled output; there are no source mounts, development servers, file watchers, or hot reload.
-
-The command waits until all three services are healthy:
-
-- Client: <http://localhost:5173>
-- API health: <http://localhost:8080/health>
-- Database readiness: <http://localhost:8080/health/ready>
-
-The API runs in `Production`, so its development OpenAPI route is unavailable. `GET /health` returns HTTP 200 with a plain-text `Healthy` body when the API is running. It is a liveness check; it does not test MySQL connectivity. `GET /health/ready` returns HTTP 200 with `Healthy` when EF Core can connect to MySQL, or HTTP 503 with `Unhealthy` when it cannot. Readiness checks connectivity, not application schema. MySQL has its own Compose health check, and the API starts after MySQL is healthy.
-
-Verify the running apps with:
-
-```sh
-sh scripts/smoke-test.sh
-docker compose ps
-```
-
-The smoke test checks API health, database readiness, the client HTML and compiled JavaScript, Vue history route fallback, and missing static asset responses. For custom published ports, pass `API_PORT` and `CLIENT_PORT` to the script, or set `API_URL` and `CLIENT_URL` directly. For example: `API_PORT=8081 CLIENT_PORT=5174 sh scripts/smoke-test.sh`.
-
-After changing either app or its dependencies, rebuild and recreate the containers with `docker compose up --build --wait`. Restarting an existing container does not rebuild the app. Commit client dependency changes with the updated `client/package-lock.json`.
-
-## Run development with dotnet and npm
-
-Install Make, Docker with Docker Compose, the .NET 10 SDK, and a Node.js version supported by `client/package.json`. Install dependencies, then start development from the repository root:
+Install Docker with Compose, Make, .NET 10, and a Node.js version supported by `client/package.json`. From the repository root, run:
 
 ```sh
 make install
 make dev
 ```
 
-`make install` installs the client npm dependencies, restores API NuGet packages, and restores the pinned EF CLI tool. `make dev` starts development MySQL and runs the API and client together in your terminal. Stop the production stack with `docker compose down` first if it is running. Press Ctrl+C to stop both apps. Development MySQL stays running. Stop it with `docker compose -f docker-compose.dev.yml down` before switching to production or running `make migrate`. Run `make help` to list the shortcuts.
+`make dev` starts the development database, applies checked-in migrations, and starts the host API and Vite client. Open <http://localhost:5173>. Vite proxies `/api` to `127.0.0.1:5078`. Cookies and requests stay on the browser's current origin. The client has no browser API URL configuration or CORS requirement.
 
-To run each app separately, use the commands below. Docker runs only MySQL during development. Start the development database from the repository root:
-
-```sh
-docker compose -f docker-compose.dev.yml up -d --wait
-```
-
-Run the API from the repository root:
-
-```sh
-dotnet run --project api/api.csproj
-```
-
-You can also run `dotnet run` from `api/`. The launch profile selects `Development`, and `api/appsettings.Development.json` supplies the local connection string.
-
-In another terminal, run the client:
-
-```sh
-cd client
-npm install
-npm run dev
-```
-
-The development URLs are:
-
-- Client: <http://localhost:5173>
-- API health: <http://localhost:5078/health>
-- Database readiness: <http://localhost:5078/health/ready>
-- OpenAPI: <http://localhost:5078/openapi/v1.json>
-
-Development MySQL listens on `127.0.0.1:3307`. Its database, user, and password are all `twitter_net_dev`. These fixed local defaults match `api/appsettings.Development.json`. To use another database or credentials, update that file or override `ConnectionStrings__DefaultConnection` through an environment variable or .NET user secrets. The API does not load the root Compose `.env` file.
-
-Stop the current mode before starting the other. To switch from the production stack to development, run from the repository root:
-
-```sh
-docker compose down
-docker compose -f docker-compose.dev.yml up -d --wait
-```
-
-Then start the API and client with the commands above. To switch back, stop both CLI processes with Ctrl+C, then run:
+Stop the production stack with `docker compose down` before starting development. Press Ctrl+C to stop the host apps. Stop development MySQL before switching modes:
 
 ```sh
 docker compose -f docker-compose.dev.yml down
-docker compose up --build --wait
 ```
 
-Each mode keeps its own database volume. Development uses `twitter-net-dev_mysql_data`; the production stack uses `twitter-net_mysql_data`. Both `down` commands preserve data.
+Development MySQL uses loopback port 3307 and the separate `twitter-net-dev_mysql_data` volume. The database name, username, and password are `twitter_net_dev`, matching `api/appsettings.Development.json`. Environment variables or .NET user secrets can override `ConnectionStrings:DefaultConnection`. The API does not read the root `.env` file.
 
-## Container configuration
-
-Both app containers run as non-root users with dropped Linux capabilities and privilege escalation disabled. Their root filesystems are read-only, with writable temporary storage in `/tmp`. Runtime images omit the .NET SDK, Node.js, source code, and development dependencies. Each app image includes a health check, including when run without Compose.
-
-Nginx supports Vue history routes, caches hashed assets, and revalidates the HTML entry point. Container logs rotate at 10 MB per file with three files per service. Restart policies restart stopped processes unless the containers were explicitly stopped.
-
-The API receives `ConnectionStrings__DefaultConnection`, pointing to MySQL at `db:3306`. EF Core uses the Oracle `MySql.EntityFrameworkCore` provider and a scoped `AppDbContext`. API startup requires a nonempty connection string. When browser API calls are added, the API must enable CORS for the client origin.
-
-Vite embeds public configuration at build time. The client image receives `VITE_API_URL` through `build.args`, using the configured API port. Setting a container environment variable after the build does not change the bundled URL. Never put secrets in `VITE_` variables.
-
-Both services use HTTP inside the local Docker setup and publish ports on loopback only. Configure TLS at a reverse proxy and set deployment credentials before exposing the application beyond this machine.
-
-## Configuration and data
-
-The production Compose stack includes local default credentials, so copying an environment file is optional:
+To run the components separately, start development MySQL, apply the schema, then start the host processes:
 
 ```sh
-cp .env.example .env
+docker compose -f docker-compose.dev.yml up -d --wait
+make migrate-dev
+dotnet run --project api/api.csproj
 ```
 
-Edit `.env` to change production Compose credentials or published ports, then rebuild and recreate the containers. It is ignored by Git. The default credentials are for local use only; production MySQL is available inside the Compose network and has no published host port. Database credentials are applied when the MySQL volume is first initialized. The development Compose file has fixed local credentials and does not use these `.env` settings. Changing development credentials requires a matching API connection string.
+In another terminal, run `npm --prefix client run dev`. API health is at <http://localhost:5078/health>, database readiness at <http://localhost:5078/health/ready>, and development OpenAPI at <http://localhost:5078/openapi/v1.json>.
 
-MySQL data persists in the existing `mysql_data` volume. Stop the services without deleting data with:
+## Run Docker on local HTTP
+
+Stop the host API, Vite, and development database first. The production Compose stack runs compiled assets and uses the separate `twitter-net_mysql_data` volume. Copy `.env.example` to the ignored `.env` if you need different local credentials or ports.
+
+For the first run, create the database and apply migrations before serving account requests:
 
 ```sh
+docker compose up -d --wait db
+make migrate
+AUTH_ALLOW_INSECURE_HTTP=true docker compose up --build --wait
+```
+
+Open <http://localhost:5173>. Nginx proxies `/api` to the API. The explicit `AUTH_ALLOW_INSECURE_HTTP=true` setting enables local HTTP cookies with unprefixed names. Keep this setting out of public deployments. Reuse it when recreating local HTTP containers, or set it in your ignored local `.env`.
+
+Production authentication requires HTTPS by default. Without the explicit local HTTP setting, HTTP account requests return a JSON `https_required` problem. Health endpoints remain available over HTTP.
+
+Use these commands to inspect or stop the stack:
+
+```sh
+sh scripts/smoke-test.sh
+docker compose ps
 docker compose down
 ```
 
-Do not use `down --volumes` unless you intend to delete database data. Old dependency and build-cache volumes from the previous development setup are no longer used.
+Both `down` commands preserve their database volumes. Do not delete volumes to apply a migration. After code changes, rebuild with `docker compose up --build --wait`, including the local HTTP setting when applicable. `make migrate` runs the current EF tools image against the private production database. The API never applies production migrations at startup. Readiness checks connectivity, rather than schema compatibility.
 
-## Develop with EF Core
+## Run Docker with HTTPS
 
-Install the .NET 10 SDK to run the API or author migrations on your host. `api/Data/AppDbContext.cs` has no entities yet. Add each entity and its `DbSet` there when you implement the corresponding application feature. Create the first migration with the first entity.
+The optional TLS overlay terminates HTTPS in Nginx and forwards the verified request scheme to the API. Put `fullchain.pem` and `privkey.pem` in a directory outside the repository. Make that directory and key readable by the container's `nginx` user through a dedicated group or ACL. Check its numeric identity with `docker compose run --rm --no-deps --entrypoint id client`. Keep the private key inaccessible to unrelated host users.
 
-Start the development database as described above. From the repository root, enter `api/`, then restore the project and the pinned EF tool:
+After applying migrations, run:
 
 ```sh
-cd api
-dotnet restore
+TLS_CERTIFICATE_DIR=/absolute/path/to/certificates AUTH_ALLOW_INSECURE_HTTP=false \
+  docker compose -f docker-compose.yml -f docker-compose.tls.yml up --build --wait
+```
+
+Open <https://localhost:8443> with a certificate valid for your hostname. The overlay binds HTTPS to loopback port 8443. For a public deployment, explicitly set `HTTPS_BIND_ADDRESS` and `HTTPS_PORT`, provide a publicly trusted certificate, and configure the deployment firewall and hostname. Certificate issuance and renewal are deployment responsibilities.
+
+Secure mode uses `__Host-` cookies with `Secure`, `HttpOnly`, `SameSite=Lax`, and `Path=/`, without `Domain`. The API trusts forwarded headers only from configured `Auth:KnownProxies` addresses, with a one-proxy limit. An empty list disables forwarded-header processing. Compose reserves `172.30.0.0/24`, and the trusted Nginx address is `172.30.0.10`. If that subnet conflicts with your network, change the Compose subnet, client address, and API trusted proxy setting together. Never configure arbitrary proxy trust. Nginx replaces incoming forwarded headers with its own peer address and scheme.
+
+Both app containers run without root privileges, with read-only root filesystems, dropped capabilities, and temporary storage under `/tmp`. The database receives structured `Database__*` settings through a connection-string builder, so password punctuation cannot add connection options. No credentials belong in `VITE_` variables.
+
+## Manage the schema and keys
+
+Identity users, hashed server sessions, and Data Protection keys live in MySQL through `api/Data/AppDbContext.cs`. Create migrations from `api/`:
+
+```sh
 dotnet tool restore
+dotnet ef migrations add DescriptiveName -- --environment Development
 ```
 
-Pass `-- --environment Development` to host EF commands so they load `appsettings.Development.json`. To override the connection string with .NET user secrets, initialize the project with `dotnet user-secrets init` and set `ConnectionStrings:DefaultConnection`.
+Commit generated migration files. Apply them with `make migrate-dev` or `make migrate` for the selected run mode.
 
-After adding your first entity, create a migration:
+Data Protection uses the stable application name `twitter-net-auth-v1`. Its keys persist in MySQL, so replacing an API container preserves valid cookies. Database access controls and backups must protect that table. By default, its key XML is not encrypted at rest. Before public deployment, mount a persistent certificate containing a private key read-only into the API container, and configure `Auth__KeyCertificatePath` and `Auth__KeyCertificatePassword` through your secret mechanism. The .NET certificate loader accepts PKCS#12 files. Keep the same certificate available across replacements, and retain old certificates during key rotation. The certificate and password must never be committed. Certificate protection encrypts newly generated keys. Existing plaintext key rows and backups require a separate controlled migration or rotation plan. Do not delete active keys merely to enable encryption.
+
+## Verify account behavior
+
+Run client checks from `client/`:
 
 ```sh
-dotnet ef migrations add InitialCreate -- --environment Development
+npm run build
+npm run test:unit -- --run
+npm run test:e2e
 ```
 
-Migration generation requires a valid connection string but does not need a running database. Commit the generated migration files. The API does not create tables or apply migrations at startup.
+Playwright starts Vite automatically. Account browser tests require the host development API and migrated development database to be running. Install the matching browsers with `npx playwright install` if needed. CI requires a client build before the browser suite.
 
-To apply migrations to the development database, run from `api/`:
+API tests use real MySQL and create a randomly named `auth_test_*` database for each test. They drop only databases they created. Never point the test connection at an application account database. Start a separate test server with a user allowed to create and drop databases:
 
 ```sh
-dotnet ef database update -- --environment Development
+docker run -d --name twitter-net-auth-test-db \
+  -e MYSQL_ROOT_PASSWORD=auth_test_only -p 127.0.0.1:3308:3306 mysql:8.4
+make test-api
 ```
 
-The production Compose database has no host port. To apply migrations to that private database, run from the repository root while using the production mode:
+The default test connection is loopback port 3308 with the test-only credentials above. Set `AUTH_TEST_MYSQL` to a dedicated server connection to override it. The project-oriented test entry point is `api.Tests/api.Tests.csproj`, which directly references the API. No solution file is required. To stop that test container without removing its data, run `docker stop twitter-net-auth-test-db`.
 
-```sh
-docker compose --profile tools run --build --rm ef database update
-```
+The suite covers normalization and concurrent uniqueness, CSRF on each mutation, authorization, lockout, rate limits, revoked-cookie replay, idle and absolute expiry, security-stamp changes, cookie attributes, key persistence, database outages, and request limits. See [the backend checklist](docs/auth-tasks.md) for scope and remaining deployment work.
 
-`make migrate` runs the same command against the production Compose database. Stop the development apps and database before running it.
+## Authentication contract
 
-This command builds the SDK tools image with the current source and migrations, waits for a healthy database, and runs `dotnet ef database update` on the Compose network. The `ef` service runs only when requested through the `tools` profile. It does not change the API runtime image or mount source files. Use `--build` after each migration change so the command uses the current migration files.
+`GET /api/auth/session` returns the public account or `null`, a CSRF token, and session deadlines. `GET /api/auth/me` requires a valid server session. `POST /api/auth/signup`, `/login`, and `/logout` require the current `X-CSRF-TOKEN` header. Refresh `/session` after an identity change. Authentication responses use `Cache-Control: no-store`.
 
-## Image maintenance
+Passwords contain 15 to 128 characters and are never trimmed. Identity hashes them with PBKDF2 at 210,000 iterations. Usernames contain 3 to 30 ASCII letters, digits, or underscores. Names contain 1 to 100 characters after trimming. Emails are trimmed, limited to 254 characters, and uniquely normalized. Conflict and login failures use generic messages.
 
-Base images and MySQL are pinned by digest for repeatable builds. Periodically check their tags with `docker buildx imagetools inspect IMAGE:TAG`, update the corresponding digests in the Dockerfiles and both Compose files, and rebuild and test. Rebuilding alone does not advance a pinned image to a newer security update.
+A cryptographically random session identifier is protected in the authentication cookie. MySQL stores its SHA-256 hash. Each authenticated request checks the session and current security stamp. Sessions expire after eight hours or 30 minutes without authenticated requests. Activity can extend only the idle deadline. Sign-out deletes the current server session before clearing the cookie. Cookies are browser-session cookies, so there is no unrequested remember-me option.
+
+Login locks an account for 15 minutes after five failures. Authentication mutations also have a per-client-IP limit of 20 per minute and a global concurrent-request limit of 32. IP limits run in process and require shared storage before scaling to multiple API replicas. Requests have a 16 KiB body limit. There is no email verification, password recovery, MFA, or account-management interface yet.
 
 ## License
 
