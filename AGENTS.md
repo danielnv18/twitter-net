@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-- `api/` contains a .NET 10 ASP.NET Core API. Routes live in `Program.cs`; `api.http` provides sample requests.
+- `api/` contains a .NET 10 ASP.NET Core API. The startup pipeline lives in `Program.cs`; authentication routes and sessions live in `Auth/`, with EF models and migrations in `Data/` and `Migrations/`. `api.http` provides sample requests.
 - `client/src/` contains Vue components and TypeScript, with routing in `router/` and Pinia stores in `stores/`. Put static assets in `client/public/`.
 - Client unit tests live in `client/src/__tests__/`; browser tests live in `client/e2e/`.
 - Root `docker-compose.yml` connects the production API, compiled client, and MySQL. Each application has its own Dockerfile. `docker-compose.dev.yml` runs only the development database for host CLI development.
@@ -39,7 +39,7 @@ For C#, preserve four-space indentation and existing brace placement. Use Pascal
 
 Run client tests from `client/`: `npm run test:unit -- --run` uses Vitest, Vue Test Utils, and jsdom; `npm run test:e2e` uses Playwright. Install browsers with `npx playwright install` first. Playwright starts the development server automatically; CI requires a prior client build.
 
-Name tests `*.spec.ts`. Add regression tests for changed behavior. No coverage threshold or API test project is configured yet.
+Name tests `*.spec.ts`. Add regression tests for changed behavior. API integration tests live in `api.Tests/` and use an isolated real MySQL server on loopback port 3308. Run `make test-api`; override only a dedicated test-server connection with `AUTH_TEST_MYSQL`. Tests create and drop their own randomly named databases. No coverage threshold is configured.
 
 ## Commit & Pull Request Guidelines
 
@@ -49,4 +49,4 @@ Pull requests should explain changes, link issues, list validation, and include 
 
 ## Security & Configuration
 
-Use `.env.example` as the template for ignored local `.env` files. The root `.env` configures the production Compose stack only. Never commit secrets. Compose credentials are local defaults; MySQL data persists in separate named volumes for each mode. `api/appsettings.Development.json` matches the fixed development database credentials; environment variables or .NET user secrets can override that connection string. The API uses EF Core with MySQL through `ConnectionStrings__DefaultConnection`; `/health/ready` checks database connectivity. Treat `VITE_` variables as public browser configuration.
+Use `.env.example` as the template for ignored local `.env` files. The root `.env` configures the production Compose stack only. Never commit secrets. Compose credentials are local defaults; MySQL data persists in separate named volumes for each mode. `api/appsettings.Development.json` matches the fixed development database credentials; environment variables or .NET user secrets can override that connection string. The API accepts `ConnectionStrings__DefaultConnection`. Compose supplies structured `Database__Server`, `Database__Port`, `Database__Name`, `Database__User`, and `Database__Password` settings, which take precedence and are assembled with a connection-string builder. `/health/ready` checks database connectivity. Treat `VITE_` variables as public browser configuration.

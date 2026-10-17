@@ -9,8 +9,6 @@ RUN npm ci
 COPY --chown=node:node . .
 
 FROM source AS build
-ARG VITE_API_URL=http://localhost:8080
-ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 FROM nginx:stable-alpine@sha256:ed84151ed2d47ef93c0939eb9b9754c6990db6092cd2081e11988a47a83d47ea AS runtime

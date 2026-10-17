@@ -9,3 +9,49 @@ GET {{api_HostAddress}}/health/ready
 Accept: text/plain
 
 ###
+
+# Development requests use the browser origin through Vite when run in a browser.
+# Keep cookies between requests and copy csrfToken from the session response.
+@csrfToken = replace-with-current-session-csrf-token
+
+GET {{api_HostAddress}}/api/auth/session
+Accept: application/json
+
+###
+
+POST {{api_HostAddress}}/api/auth/signup
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrfToken}}
+
+{
+  "name": "Example Person",
+  "username": "example_person",
+  "email": "example@example.test",
+  "password": "a long example passphrase"
+}
+
+###
+
+POST {{api_HostAddress}}/api/auth/login
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrfToken}}
+
+{
+  "identifier": "example_person",
+  "password": "a long example passphrase"
+}
+
+###
+
+GET {{api_HostAddress}}/api/auth/me
+Accept: application/json
+
+###
+
+POST {{api_HostAddress}}/api/auth/logout
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrfToken}}
+
+{}
+
+###
